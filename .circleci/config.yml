@@ -31,7 +31,7 @@ jobs:
         - ~/.go_workspace
         - ~/.gradle
         - ~/.cache/bower
-    - run: sudo pip install json-spec
+    - run: sudo pip install json-spec 
     - run: json validate --schema-file=.github/schema.json --document-file=contents.json
     - run: ruby .github/osia_validate_categories.rb
     - store_test_results:

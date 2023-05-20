@@ -9,19 +9,19 @@ j = get_json
 apps = j['projects']
 updated = []
 
-apps.each do |a|
+apps.each_with_index do |a, index|
   s = a['source']
   if s.nil?
     updated.push a
   elsif !(s.include? 'github')
     updated.push a
   else
-    print '.'
+    print "#{index+1}/#{apps.count}\n"
     begin
         g = s.gsub('https://github.com/', '')
         r = client.repo g
-        stars = r['stargazers_count']
-        a['stars'] = stars
+        a['stars'] = r['stargazers_count']
+        a['updated'] = r['pushed_at']
         updated.push a
       rescue => e
         puts "\nerror for #{s}: #{e}"

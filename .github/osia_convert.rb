@@ -8,7 +8,6 @@ ARCHIVE = 'ARCHIVE.md'
 APPSTORE = 'APPSTORE.md'
 LATEST = 'LATEST.md'
 
-NOT_ENGLISH = '🌐'
 ARCHIVE_TAG = 'archive'
 
 LATEST_NUM = 30
@@ -69,6 +68,14 @@ def apps_latest(apps, num)
   a[0..num - 1]
 end
 
+def apps_updated(apps, num)
+  a = apps.select { |a| a['updated'] != nil }
+  .sort_by { |k, v| DateTime.parse(k['updated']) }
+  .reverse
+
+  a[0..num - 1]
+end
+
 def output_apps(apps, appstoreonly)
   o = ''
   apps.each do |a|
@@ -79,80 +86,87 @@ def output_apps(apps, appstoreonly)
     desc = a['description']
     tags = a['tags']
     stars = a['stars']
-    lang = a['lang']
-
-    date_added = a['date_added']
+    date_updated = a['updated']
     screenshots = a['screenshots']
     license = a['license']
 
-    t = "[#{name}](#{link})"
+    lines = []
 
-    if desc.nil?
-      t << ' '
-    else
-      t << ": #{desc} " if desc.size>0
+    line = []
+    line.push "[#{name}](#{link})"
+
+    unless desc.nil?
+      line.push ": #{desc}" if desc.size>0
     end
 
+    lines.push line
+
+    line = []
+    unless homepage.nil?
+      line.push "<a href=#{homepage}>`#{homepage}`</a>"
+    end
+
+    lines.push line
+
+    line = []
     unless itunes.nil?
-      t << "[` App Store`](#{itunes}) "
+      line.push "[` App Store`](#{itunes})"
     end
 
     if appstoreonly
       next if itunes.nil?
     end
 
-    o << "- #{t} \n"
-    o <<  "  <details>\n\t<summary>"
+    unless screenshots.nil? || screenshots.empty?
+      screenshots.each_with_index do |s, i|
+        line.push " <a href='#{screenshots[i]}'>`Screenshot #{i+1}`</a> "
+      end
+    end
 
-    details = ""
+    lines.push line
+
+    line = []
+
+    unless date_updated.nil?
+      date = DateTime.parse(date_updated)
+      formatted_date = date.strftime "%Y"
+      line.push " `#{formatted_date}` "
+    end
+
+    # unless license.nil?
+    #   license_display = license == 'other' ? "" : "[`#{license}`](http://choosealicense.com/licenses/#{license}/)"
+    #   line.push << " #{license_display} "
+    # end
 
     unless tags.nil?
-      details << '<code>swift</code> ' if tags.include? 'swift'
+      line.push '`swift` ' if tags.include? 'swift'
       tags.each do |t|
-        details << "<code>#{t.downcase}</code> " if t.downcase != 'swift'
+        line.push "`#{t.downcase}` " if t.downcase != 'swift'
       end
     end
 
-    details << "#{NOT_ENGLISH} " unless lang.nil?
+   lines.push line
 
-    unless stars.nil?
-      details << output_stars(stars)
-    end
-    o << details
+   line = []
+   unless stars.nil?
+    line.push " ☆`#{stars}` " if stars > 0
+   end
 
-    o << "</summary>"
+   lines.push line
 
-    details_list = []
-    unless homepage.nil?
-      details_list.push homepage
-    end
+   lines.each_with_index do |item, i|
+     temp = ''
+     item.each { |x| temp << "#{x}" }
+     unless temp.empty?
+       if i == 0
+         o << "\n- #{temp}"
+       else
+         o << "\n  - #{temp}"
+       end
+     end
+   end
 
-    unless date_added.nil?
-      date = DateTime.parse(date_added)
-      formatted_date = date.strftime "%B %e, %Y"
-      details_list.push "Added #{formatted_date}"
-    end
-
-    unless license.nil?
-      license_display = license == 'other' ? "`#{license}`" : "[`#{license}`](http://choosealicense.com/licenses/#{license}/)"
-      details_list.push "License: #{license_display}"
-    end
-
-    details = "\n\n\t"
-    details << details_list[0]
-    details_list[1..-1].each { |x| details << "<br>  #{x}" }
-
-    unless screenshots.nil? || screenshots.empty?
-      details << "<br>"
-      details << "\n\t"
-      screenshots.each_with_index do |s, i|
-        details << "<a href='#{screenshots[i]}'><code>Screenshot #{i+1}</code></a> "
-      end
-    end
-
-    details << "\n  "
-    details << "</details>\n\n"
-    o << details
+   # o << "\n"
   end
   o
 end
@@ -170,23 +184,6 @@ def output_badges(count, twitter)
 
   b << " ![](https://img.shields.io/badge/Updated-#{date_display}-lightgrey.svg)"
   return b
-end
-
-def output_stars(number)
-  case number
-  when 100...200
-    '⭐'
-  when 200...500
-    '⭐⭐'
-  when 500...1000
-    '⭐⭐⭐'
-  when 1000...2000
-    '⭐⭐⭐⭐'
-  when 2000...100000
-    '⭐⭐⭐⭐⭐'
-  else
-    ''
-  end
 end
 
 def write_archive(j, subtitle)
@@ -213,18 +210,32 @@ def write_archive(j, subtitle)
   puts "wrote #{file} ✨"
 end
 
-def write_latest(j, num, subtitle)
+def write_latest(j, num, sub1, sub2)
   t = j['title']
   apps = j["projects"]
   footer = j['footer']
   latest = apps_latest(apps, num)
 
   output = "\# #{t} Latest\n\n"
-  output << subtitle
+  output << sub1
   output << "\n"
 
   count = 1
   latest.each do |a|
+    t = a['title']
+    s = a['source']
+    output << "#{count}. [#{t}](#{s})\n"
+    count = count + 1
+  end
+
+  updated = apps_updated(apps, num)
+
+  output << "\n"
+  output << sub2
+  output << "\n"
+
+  count = 1
+  updated.each do |a|
     t = a['title']
     s = a['source']
     output << "#{count}. [#{t}](#{s})\n"
@@ -316,5 +327,6 @@ write_list(j, APPSTORE, subtitle_app_store, true)
 subtitle_archive = "This is an archive of the [main list](https://github.com/dkhamsing/open-source-ios-apps) for projects that are no longer maintained / old.\n\n"
 write_archive(j, subtitle_archive)
 
-subtitle_latest = "These are the #{LATEST_NUM} latest entries from the [main list](https://github.com/dkhamsing/open-source-ios-apps).\n\n"
-write_latest(j, LATEST_NUM, subtitle_latest)
+subtitle_latest = "## Lastest additions to the [main list](https://github.com/dkhamsing/open-source-ios-apps)\n"
+subtitle_updated = "## Most recently updated\n"
+write_latest(j, LATEST_NUM, subtitle_latest, subtitle_updated)
